@@ -3,223 +3,231 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plastic Patrol - 2D Platformer</title>
+    <title>Plastic Patrol: Eco Edition</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            background: #1a1a1a;
+            background: #141923;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Courier New', Courier, monospace;
             color: #fff;
             overflow: hidden;
+            user-select: none;
         }
         #game-container {
             position: relative;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            border-radius: 8px;
-            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            border: 6px solid #2c3e50;
+            border-radius: 12px;
+            background: #5c94fc; /* Mario-esque Sky Blue */
         }
         canvas {
             display: block;
-            background: #87CEEB; /* Sky Blue */
         }
         #ui {
             position: absolute;
             top: 16px;
             left: 16px;
-            font-size: 20px;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
-            pointer-events: none;
+            right: 16px;
             display: flex;
-            gap: 20px;
+            justify-content: space-between;
+            pointer-events: none;
         }
-        .score-box { background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 4px; }
-        #plastic-score { color: #4effef; }
-        #strikes-score { color: #ff4e4e; }
-        #game-over-screen {
+        .score-box {
+            background: rgba(0, 0, 0, 0.65);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 22px;
+            font-weight: bold;
+            border: 2px solid #34495e;
+            letter-spacing: 1px;
+        }
+        #plastic-score { color: #00ffcc; text-shadow: 0 0 8px rgba(0,255,204,0.5); }
+        #strikes-container { color: #ff4d4d; }
+        .heart { display: inline-block; margin-left: 5px; color: #ff4d4d; }
+        
+        #screen-overlay {
             position: absolute;
-            top: 0; left: 0; width: 800px; height: 400px;
-            background: rgba(0,0,0,0.85);
+            top: 0; left: 0; width: 800px; height: 440px;
+            background: rgba(20, 25, 35, 0.85);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 10;
+            backdrop-filter: blur(4px);
         }
         .hidden { display: none !important; }
-        h1 { margin: 0 0 10px 0; font-size: 42px; color: #4effef; }
-        p { margin: 0 0 20px 0; font-size: 18px; color: #ccc; text-align: center; max-width: 400px; }
+        h1 { margin: 0 0 10px 0; font-size: 48px; color: #00ffcc; text-shadow: 0 4px 0 #127f67; }
+        p { margin: 0 0 25px 0; font-size: 18px; color: #a0aec0; text-align: center; line-height: 1.6; }
+        
         button {
-            padding: 12px 28px;
-            font-size: 18px;
+            padding: 14px 36px;
+            font-size: 20px;
+            font-family: inherit;
             font-weight: bold;
-            background: #4effef;
-            color: #1a1a1a;
+            background: #00ffcc;
+            color: #141923;
             border: none;
-            border-radius: 4px;
+            border-bottom: 4px solid #00b38f;
+            border-radius: 6px;
             cursor: pointer;
-            transition: transform 0.1s, background 0.2s;
+            box-shadow: 0 5px 15px rgba(0,255,204,0.3);
         }
-        button:hover { background: #3adad0; transform: scale(1.05); }
-        #instructions {
-            margin-top: 15px;
+        button:hover { background: #26ffd5; transform: translateY(-2px); }
+        button:active { transform: translateY(2px); border-bottom-width: 0; margin-top: 4px; }
+        
+        #controls-guide {
+            margin-top: 20px;
             font-size: 14px;
-            color: #aaa;
+            color: #718096;
             text-align: center;
         }
+        .highlight { color: #00ffcc; font-weight: bold; }
+        .danger { color: #ff7675; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="game-container">
         <div id="ui">
-            <div class="score-box">Plastic Collected: <span id="plastic-score">0</span></div>
-            <div class="score-box">Strikes: <span id="strikes-score">0/3</span></div>
+            <div class="score-box">PLASTIC: <span id="plastic-score">0000</span></div>
+            <div class="score-box">LIVES: <span id="strikes-container">❤️❤️❤️</span></div>
         </div>
         
-        <div id="game-over-screen" class="hidden">
-            <h1 id="game-title">GAME OVER</h1>
-            <p id="game-msg">You collected wrong trash too many times!</p>
-            <button id="restart-btn">Play Again</button>
+        <div id="screen-overlay">
+            <h1 id="screen-title">PLASTIC PATROL</h1>
+            <p id="screen-desc">Collect the glowy <span class="highlight">Plastic Bottles</span> to clean the zone.<br>Ignore or dodge <span class="danger">Organic Trash & Boxes</span>!</p>
+            <button id="action-btn">START GAME</button>
         </div>
 
-        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <canvas id="gameCanvas" width="800" height="440"></canvas>
     </div>
 
-    <div id="instructions">
-        <strong>Controls:</strong> Use ◄ ► or A / D to Move. Spacebar or W to Jump.<br>
-        Target <span style="color:#4effef">Plastic Bottles</span>. Avoid <span style="color:#ffae4e">Organic</span> and <span style="color:#ffffff">Paper</span> trash!
+    <div id="controls-guide">
+        [A / D] or [◄ / ►] to Move &nbsp;&bull;&nbsp; [W], [SPACE], or [▲] to Jump
     </div>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Game State
+// Game State Engine
 let score = 0;
-let strikes = 0;
-const maxStrikes = 3;
+let lives = 3;
 let gameOver = false;
+let gameStarted = false;
 let keys = {};
+let animationFrame = 0;
 
-// Physics constants
-const gravity = 0.6;
-const friction = 0.85;
+// Physics Config
+const gravity = 0.55;
+const friction = 0.82;
 
-// Player Setup
+// Character Properties
 const player = {
-    x: 100,
-    y: 300,
-    width: 32,
-    height: 48,
-    vx: 0,
-    vy: 0,
-    speed: 5,
-    jumpForce: 12,
-    grounded: false,
-    color: '#ffcc00'
+    x: 100, y: 300, width: 28, height: 44,
+    vx: 0, vy: 0, speed: 5.5, jumpForce: 12.5,
+    grounded: false, facingRight: true, walkTimer: 0
 };
 
-// Platforms (Mario style layout)
+// Map Structure (Mario Retro Grid Layout)
 const platforms = [
-    { x: 0, y: 370, width: 800, height: 30 },   // Ground
-    { x: 150, y: 280, width: 120, height: 15 }, 
-    { x: 340, y: 200, width: 150, height: 15 },
-    { x: 550, y: 270, width: 120, height: 15 },
-    { x: 50, y: 160, width: 160, height: 15 },
-    { x: 600, y: 130, width: 140, height: 15 }
+    { x: 0, y: 400, width: 800, height: 40, type: 'floor' },   // Ground floor
+    { x: 60, y: 300, width: 160, height: 20 },
+    { x: 300, y: 220, width: 200, height: 20 },
+    { x: 580, y: 300, width: 160, height: 20 },
+    { x: 100, y: 130, width: 140, height: 20 },
+    { x: 560, y: 130, width: 140, height: 20 }
 ];
 
-// Trash Setup
-// Types: 'plastic' (good), 'organic' (bad), 'paper' (bad)
 let items = [];
-const itemTypes = [
-    { type: 'plastic', color: '#00d2ff', label: '⚱️' },
-    { type: 'organic', color: '#ff9f43', label: '🍏' },
-    { type: 'paper', color: '#ffffff', label: '📦' }
-];
+let spawnTimeout;
 
-// Event Listeners for controls
-window.addEventListener('keydown', e => keys[e.code] = true);
+// Input Bindings
+window.addEventListener('keydown', e => { if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) e.preventDefault(); keys[e.code] = true; });
 window.addEventListener('keyup', e => keys[e.code] = false);
-document.getElementById('restart-btn').addEventListener('click', resetGame);
+document.getElementById('action-btn').addEventListener('click', handleButtonClick);
 
-function spawnItem() {
-    if (gameOver) return;
-    
-    // Pick a random platform to spawn above (excluding ground level sometimes for variety)
-    const plat = platforms[Math.floor(Math.random() * platforms.length)];
-    const typeObj = itemTypes[Math.floor(Math.random() * itemTypes.length)];
-    
-    // Random offset on the platform
-    const x = plat.x + Math.random() * (plat.width - 20);
-    const y = plat.y - 25;
-
-    // Avoid duplicate spawns instantly at the exact same spot
-    if (!items.some(item => Math.abs(item.x - x) < 20 && Math.abs(item.y - y) < 20)) {
-        items.push({
-            x: x,
-            y: y,
-            width: 20,
-            height: 20,
-            type: typeObj.type,
-            color: typeObj.color,
-            label: typeObj.label
-        });
+function handleButtonClick() {
+    if (!gameStarted || gameOver) {
+        resetGame();
+        gameStarted = true;
+        gameOver = false;
+        document.getElementById('screen-overlay').classList.add('hidden');
+        clearTimeout(spawnTimeout);
+        spawnItem();
     }
-
-    // Keep spawning loop going dynamically
-    setTimeout(spawnItem, Math.random() * 1500 + 800);
 }
 
-function checkCollision(rect1, rect2) {
-    return rect1.x < rect2.x + rect2.width &&
-           rect1.x + rect1.width > rect2.x &&
-           rect1.y < rect2.y + rect2.height &&
-           rect1.y + rect1.height > rect2.y;
+function spawnItem() {
+    if (gameOver || !gameStarted) return;
+    
+    // Pick a targeted platform surface layout
+    const plat = platforms[Math.floor(Math.random() * platforms.length)];
+    const roll = Math.random();
+    let type = 'plastic';
+    if (roll > 0.45 && roll <= 0.75) type = 'organic';
+    else if (roll > 0.75) type = 'paper';
+    
+    const x = plat.x + 15 + Math.random() * (plat.width - 45);
+    const y = plat.y - 30;
+
+    // Check overlap boundaries to reduce cluster spawns
+    if (!items.some(i => Math.abs(i.x - x) < 35 && Math.abs(i.y - y) < 35)) {
+        items.push({ x, y, width: 24, height: 28, type, bobOffset: Math.random() * Math.PI });
+    }
+
+    spawnTimeout = setTimeout(spawnItem, Math.random() * 1200 + 600);
+}
+
+function checkCollision(r1, r2) {
+    return r1.x < r2.x + r2.width && r1.x + r1.width > r2.x &&
+           r1.y < r2.y + r2.height && r1.y + r1.height > r2.y;
 }
 
 function update() {
-    if (gameOver) return;
+    if (gameOver || !gameStarted) return;
 
-    // Movement logic
+    animationFrame++;
+
+    // Movement Physics
     if (keys['ArrowRight'] || keys['KeyD']) {
-        if (player.vx < player.speed) player.vx++;
+        if (player.vx < player.speed) player.vx += 0.8;
+        player.facingRight = true;
+        if(player.grounded) player.walkTimer += 0.2;
+    } else if (keys['ArrowLeft'] || keys['KeyA']) {
+        if (player.vx > -player.speed) player.vx -= 0.8;
+        player.facingRight = false;
+        if(player.grounded) player.walkTimer += 0.2;
+    } else {
+        player.walkTimer = 0;
     }
-    if (keys['ArrowLeft'] || keys['KeyA']) {
-        if (player.vx > -player.speed) player.vx--;
-    }
+
     if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && player.grounded) {
         player.vy = -player.jumpForce;
         player.grounded = false;
     }
 
-    // Apply physics
     player.vx *= friction;
     player.vy += gravity;
-
     player.x += player.vx;
     player.y += player.vy;
 
-    // Canvas boundaries
-    if (player.x < 0) player.x = 0;
-    if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+    // Screen Boundary Restraints
+    if (player.x < 0) { player.x = 0; player.vx = 0; }
+    if (player.x + player.width > canvas.width) { player.x = canvas.width - player.width; player.vx = 0; }
 
-    // Platform collisions
+    // Platform Collisions Solid Math
     player.grounded = false;
     for (let plat of platforms) {
-        // Simple AABB platform collision response
-        if (player.x < plat.x + plat.width &&
-            player.x + player.width > plat.x &&
-            player.y + player.height > plat.y &&
-            player.y + player.height - player.vy <= plat.y + 10) {
-            
+        if (player.x + player.width > plat.x && player.x < plat.x + plat.width &&
+            player.y + player.height > plat.y && player.y + player.height - player.vy <= plat.y + 12) {
             if (player.vy > 0) {
                 player.grounded = true;
                 player.vy = 0;
@@ -228,61 +236,173 @@ function update() {
         }
     }
 
-    // Item pickups
+    // Interactive Item Checks
     for (let i = items.length - 1; i >= 0; i--) {
         if (checkCollision(player, items[i])) {
             if (items[i].type === 'plastic') {
-                score += 10;
-                document.getElementById('plastic-score').innerText = score;
+                score += 100;
+                document.getElementById('plastic-score').innerText = String(score).padStart(4, '0');
             } else {
-                strikes++;
-                document.getElementById('strikes-score').innerText = `${strikes}/${maxStrikes}`;
-                if (strikes >= maxStrikes) {
-                    endGame();
-                }
+                lives--;
+                updateLivesUI();
+                if (lives <= 0) endGame();
             }
-            items.splice(i, 1); // Remove item
+            items.splice(i, 1);
         }
     }
 }
 
+function updateLivesUI() {
+    document.getElementById('strikes-container').innerText = '❤️'.repeat(Math.max(0, lives)) + '🖤'.repeat(Math.max(0, 3 - lives));
+}
+
+// Custom Vector Art Generators (No PNG dependency)
+function drawPlayer(ctx, p) {
+    ctx.save();
+    ctx.translate(p.x + p.width/2, p.y + p.height/2);
+    if (!p.facingRight) ctx.scale(-1, 1);
+
+    const bob = (!p.grounded) ? 0 : Math.sin(p.walkTimer) * 3;
+    
+    // Legs running cycle engine
+    ctx.fillStyle = '#1e272e';
+    if (!p.grounded) { // Jump pose
+        ctx.fillRect(-10, 8, 6, 10);
+        ctx.fillRect(4, 2, 6, 10);
+    } else if (p.walkTimer > 0) { // Walk animation
+        ctx.fillRect(Math.sin(p.walkTimer)*5 - 4, 8, 6, 12);
+        ctx.fillRect(-Math.sin(p.walkTimer)*5 - 4, 8, 6, 12);
+    } else { // Idle
+        ctx.fillRect(-9, 8, 6, 14);
+        ctx.fillRect(3, 8, 6, 14);
+    }
+
+    // Torso (Jacket & Overalls)
+    ctx.fillStyle = '#ff3f34'; 
+    ctx.fillRect(-12, -12 + bob, 24, 22); 
+    ctx.fillStyle = '#0abde3'; // Blue overalls denim finish
+    ctx.fillRect(-12, -2 + bob, 24, 12);
+    ctx.fillRect(-8, -8 + bob, 4, 8);
+    ctx.fillRect(4, -8 + bob, 4, 8);
+
+    // Head & Hair
+    ctx.fillStyle = '#ffdb99'; 
+    ctx.fillRect(-8, -26 + bob, 16, 15);
+    ctx.fillStyle = '#d6a2e8'; // Cap base
+    ctx.fillRect(-10, -30 + bob, 18, 6);
+    ctx.fillRect(-2, -30 + bob, 16, 3); // Cap brim/visor
+
+    // Face Detail Directional alignment
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(3, -21 + bob, 3, 4); // Eye
+    ctx.fillStyle = '#ff7675';
+    ctx.fillRect(6, -16 + bob, 3, 2); // Smile/Mouth
+
+    ctx.restore();
+}
+
+function drawPlatform(ctx, plat) {
+    // Structural Dirt Blocks Base
+    ctx.fillStyle = '#795548';
+    ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+    
+    // Grid Brick Segment Overlays 
+    ctx.strokeStyle = '#5d4037';
+    ctx.lineWidth = 2;
+    for (let bx = plat.x; bx < plat.x + plat.width; bx += 20) {
+        ctx.strokeRect(bx, plat.y, 20, plat.height);
+    }
+
+    // Bright Green Stylized Top Turf Grass Layer
+    ctx.fillStyle = '#2ecc71';
+    ctx.fillRect(plat.x, plat.y, plat.width, 6);
+    ctx.fillStyle = '#27ae60'; // Grass shadow accents
+    for(let gx = plat.x + 4; gx < plat.x + plat.width; gx += 12) {
+        ctx.fillRect(gx, plat.y + 6, 5, 4);
+    }
+}
+
+function drawItem(ctx, item) {
+    const bob = Math.sin(animationFrame * 0.08 + item.bobOffset) * 4;
+    const cx = item.x + item.width / 2;
+    const cy = item.y + item.height / 2 + bob;
+
+    ctx.save();
+    
+    if (item.type === 'plastic') {
+        // High visibility Glowing Plastic Bottle graphic
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = '#00ffcc';
+        
+        ctx.fillStyle = 'rgba(240, 255, 255, 0.85)';
+        ctx.strokeStyle = '#00ffcc';
+        ctx.lineWidth = 2;
+        
+        // Bottle shapes geometry pathing
+        ctx.beginPath();
+        ctx.rect(cx - 6, cy - 4, 12, 16);
+        ctx.rect(cx - 3, cy - 10, 6, 6);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Blue Label accent strip
+        ctx.fillStyle = '#2980b9';
+        ctx.fillRect(cx - 6, cy, 12, 4);
+    } 
+    else if (item.type === 'organic') {
+        // Rotting Apple Core Graphic profile
+        ctx.fillStyle = '#e74c3c';
+        ctx.beginPath();
+        ctx.arc(cx, cy - 6, 7, 0, Math.PI, true);
+        ctx.arc(cx, cy + 8, 7, 0, Math.PI, false);
+        ctx.fill();
+        
+        // Core center bite cylinder profile
+        ctx.fillStyle = '#f5f6fa';
+        ctx.fillRect(cx - 4, cy - 6, 8, 14);
+        ctx.fillStyle = '#2f3640'; // Seeds detail
+        ctx.fillRect(cx - 1, cy, 2, 3);
+    } 
+    else if (item.type === 'paper') {
+        // Crumpled Cardboard Waste Box graphic profile
+        ctx.fillStyle = '#d2a679';
+        ctx.strokeStyle = '#8a6d4f';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.rect(cx - 9, cy - 6, 18, 15);
+        ctx.fill();
+        ctx.stroke();
+        // Box opening flaps flap art
+        ctx.fillStyle = '#b8860b';
+        ctx.fillRect(cx - 11, cy - 10, 8, 4);
+        ctx.fillRect(cx + 3, cy - 10, 8, 4);
+    }
+    
+    ctx.restore();
+}
+
 function draw() {
-    // Clear Canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw Background Sky details (Simple clouds)
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    // Parallax background clouds decoration layers
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
     ctx.beginPath();
-    ctx.arc(200, 80, 30, 0, Math.PI * 2);
-    ctx.arc(240, 70, 40, 0, Math.PI * 2);
-    ctx.arc(280, 80, 30, 0, Math.PI * 2);
+    ctx.arc(140, 100, 25, 0, Math.PI * 2); ctx.arc(175, 90, 35, 0, Math.PI * 2); ctx.arc(210, 100, 25, 0, Math.PI * 2);
+    ctx.arc(580, 70, 20, 0, Math.PI * 2);  ctx.arc(610, 60, 30, 0, Math.PI * 2);  ctx.arc(640, 70, 20, 0, Math.PI * 2);
     ctx.fill();
 
-    // Draw Platforms
+    // Draw Map Assets
     for (let plat of platforms) {
-        ctx.fillStyle = '#4d774e'; // Grassy top color
-        ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
-        ctx.fillStyle = '#8B5A2B'; // Dirt body color
-        ctx.fillRect(plat.x, plat.y + 4, plat.width, plat.height - 4);
+        drawPlatform(ctx, plat);
     }
 
-    // Draw Trash Items
+    // Draw collectible variants
     for (let item of items) {
-        ctx.font = "20px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillText(item.label, item.x + item.width/2, item.y);
+        drawItem(ctx, item);
     }
 
-    // Draw Player (Retro Character style block)
-    ctx.fillStyle = player.color;
-    ctx.fillRect(player.x, player.y, player.width, player.height);
-    
-    // Player Eyes (shows moving direction)
-    ctx.fillStyle = '#000';
-    let eyeOffset = player.vx >= 0 ? 18 : 4;
-    ctx.fillRect(player.x + eyeOffset, player.y + 10, 6, 6);
-    ctx.fillRect(player.x + eyeOffset + 6, player.y + 10, 6, 6);
+    // Render character layer
+    drawPlayer(ctx, player);
 }
 
 function gameLoop() {
@@ -293,26 +413,26 @@ function gameLoop() {
 
 function endGame() {
     gameOver = true;
-    document.getElementById('game-over-screen').classList.remove('hidden');
+    document.getElementById('screen-title').innerText = "GAME OVER";
+    document.getElementById('screen-desc').innerHTML = `You filled the bin with too much bad trash!<br>Final Score: <span class="highlight">${score} points</span>`;
+    document.getElementById('action-btn').innerText = "TRY AGAIN";
+    document.getElementById('screen-overlay').classList.remove('hidden');
 }
 
 function resetGame() {
     score = 0;
-    strikes = 0;
-    gameOver = false;
+    lives = 3;
     items = [];
     player.x = 100;
     player.y = 300;
     player.vx = 0;
     player.vy = 0;
-    document.getElementById('plastic-score').innerText = '0';
-    document.getElementById('strikes-score').innerText = '0/3';
-    document.getElementById('game-over-screen').classList.add('hidden');
+    player.grounded = false;
+    document.getElementById('plastic-score').innerText = '0000';
+    updateLivesUI();
 }
 
-// Start the core mechanics
-resetGame();
-spawnItem();
+// System Init engine kickoff
 gameLoop();
 </script>
 
