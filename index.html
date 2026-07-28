@@ -990,16 +990,18 @@ function drawItem(ctx, item) {
         ctx.fillStyle = '#2980b9'; ctx.fillRect(cx - 6, cy, 12, 4);
     } 
     else if (item.type === 'organic') {
-        ctx.fillStyle = '#e74c3c';
-        ctx.beginPath();
-        ctx.arc(cx, cy - 5, 7, 0, Math.PI, true);
-        ctx.arc(cx, cy + 7, 7, 0, Math.PI, false);
-        ctx.fill();
-        ctx.fillStyle = '#f5f6fa'; ctx.fillRect(cx - 4, cy - 5, 8, 12);
+        // Apple Core Emoji
+        ctx.font = '24px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🍎', cx, cy + 2); 
     } 
     else if (item.type === 'paper') {
-        ctx.fillStyle = '#d2a679'; ctx.strokeStyle = '#8a6d4f'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.rect(cx - 9, cy - 6, 18, 15); ctx.fill(); ctx.stroke();
+        // Box Emoji
+        ctx.font = '24px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('📦', cx, cy + 2);
     }
     ctx.restore();
 }
