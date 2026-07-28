@@ -161,7 +161,7 @@ const gravity = 0.55;
 const friction = 0.82;
 
 const player = {
-    x: 100, y: 300, width: 28, height: 44,
+    x: 60, y: 300, width: 28, height: 44, // Shifted spawn x to 60 to clear floating platform overlap
     vx: 0, vy: 0, speed: 6, jumpForce: 13,
     grounded: false, facingRight: true, walkTimer: 0
 };
@@ -169,7 +169,7 @@ const player = {
 // Map layout distributed across 1600px width
 const platforms = [
     { x: 0, y: 400, width: 1600, height: 40 }, 
-    { x: 120, y: 300, width: 160, height: 20 },
+    { x: 140, y: 300, width: 160, height: 20 },
     { x: 340, y: 220, width: 160, height: 20 },
     { x: 100, y: 140, width: 140, height: 20 },
     { x: 580, y: 300, width: 200, height: 20 },
@@ -208,7 +208,7 @@ function handleButtonClick() {
 function setupLevel(lvl) {
     levelBottlesCollected = 0;
     items = [];
-    player.x = 100;
+    player.x = 60;
     player.y = 300;
     player.vx = 0;
     player.vy = 0;
@@ -224,10 +224,8 @@ function startSpawning() {
     function spawnLoop() {
         if (gameOver || !gameStarted) return;
         
-        // Pick a platform
         const plat = platforms[Math.floor(Math.random() * platforms.length)];
         
-        // Decide item type based on level rules
         let type = 'plastic';
         if (Math.random() > levels[currentLevel].plasticChance) {
             type = Math.random() > 0.5 ? 'organic' : 'paper';
@@ -236,7 +234,6 @@ function startSpawning() {
         const x = plat.x + 15 + Math.random() * (plat.width - 45);
         const y = plat.y - 30;
 
-        // Prevent duplicate clustering
         if (!items.some(i => Math.abs(i.x - x) < 50 && Math.abs(i.y - y) < 50)) {
             items.push({ x, y, width: 24, height: 28, type, bobOffset: Math.random() * Math.PI });
         }
@@ -282,7 +279,7 @@ function update() {
     if (player.x < 0) { player.x = 0; player.vx = 0; }
     if (player.x + player.width > worldWidth) { player.x = worldWidth - player.width; player.vx = 0; }
 
-    // Solid collisions
+    // Solid platform collisions
     player.grounded = false;
     for (let plat of platforms) {
         if (player.x + player.width > plat.x && player.x < plat.x + plat.width &&
@@ -295,14 +292,14 @@ function update() {
         }
     }
 
-    // Camera follow centering logic
+    // Camera follow tracking
     camera.x = player.x - canvas.width / 2 + player.width / 2;
     if (camera.x < 0) camera.x = 0;
     if (camera.x > worldWidth - canvas.width) camera.x = worldWidth - canvas.width;
 
-    // Item cleanup and checks
+    // Item cleanup loop with structural security check
     for (let i = items.length - 1; i >= 0; i--) {
-        if (checkCollision(player, items[i])) {
+        if (items[i] && checkCollision(player, items[i])) {
             if (items[i].type === 'plastic') {
                 globalScore += 100;
                 levelBottlesCollected++;
@@ -310,11 +307,15 @@ function update() {
                 
                 if (levelBottlesCollected >= levels[currentLevel].target) {
                     advanceLevel();
+                    break; // FIX: Instantly halts loop context execution preventing item[i] undefined freeze
                 }
             } else {
                 lives--;
                 updateUI();
-                if (lives <= 0) endGame(false);
+                if (lives <= 0) {
+                    endGame(false);
+                    break;
+                }
             }
             items.splice(i, 1);
         }
@@ -377,6 +378,7 @@ function drawPlayer(ctx, p) {
     ctx.restore();
 }
 
+// Map Layout Graphic Drawing Engine
 function drawPlatform(ctx, plat) {
     const activeColors = levels[currentLevel];
     ctx.fillStyle = activeColors.platformBottom;
@@ -440,7 +442,6 @@ function draw() {
     ctx.save();
     ctx.translate(-camera.x, -camera.y);
 
-    // Dynamic background cloud layers
     ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
     for(let cx = 60; cx < worldWidth; cx += 350) {
         ctx.beginPath();
