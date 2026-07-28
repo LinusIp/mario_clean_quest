@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plastic Patrol - 2D Platformer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            background: #87CEEB; /* Sky Blue */
+        }
+        #ui {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+            pointer-events: none;
+            display: flex;
+            gap: 20px;
+        }
+        .score-box { background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 4px; }
+        #plastic-score { color: #4effef; }
+        #strikes-score { color: #ff4e4e; }
+        #game-over-screen {
+            position: absolute;
+            top: 0; left: 0; width: 800px; height: 400px;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .hidden { display: none !important; }
+        h1 { margin: 0 0 10px 0; font-size: 42px; color: #4effef; }
+        p { margin: 0 0 20px 0; font-size: 18px; color: #ccc; text-align: center; max-width: 400px; }
+        button {
+            padding: 12px 28px;
+            font-size: 18px;
+            font-weight: bold;
+            background: #4effef;
+            color: #1a1a1a;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+        }
+        button:hover { background: #3adad0; transform: scale(1.05); }
+        #instructions {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #aaa;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="ui">
+            <div class="score-box">Plastic Collected: <span id="plastic-score">0</span></div>
+            <div class="score-box">Strikes: <span id="strikes-score">0/3</span></div>
+        </div>
+        
+        <div id="game-over-screen" class="hidden">
+            <h1 id="game-title">GAME OVER</h1>
+            <p id="game-msg">You collected wrong trash too many times!</p>
+            <button id="restart-btn">Play Again</button>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+    </div>
+
+    <div id="instructions">
+        <strong>Controls:</strong> Use ◄ ► or A / D to Move. Spacebar or W to Jump.<br>
+        Target <span style="color:#4effef">Plastic Bottles</span>. Avoid <span style="color:#ffae4e">Organic</span> and <span style="color:#ffffff">Paper</span> trash!
+    </div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Game State
+let score = 0;
+let strikes = 0;
+const maxStrikes = 3;
+let gameOver = false;
+let keys = {};
+
+// Physics constants
+const gravity = 0.6;
+const friction = 0.85;
+
+// Player Setup
+const player = {
+    x: 100,
+    y: 300,
+    width: 32,
+    height: 48,
+    vx: 0,
+    vy: 0,
+    speed: 5,
+    jumpForce: 12,
+    grounded: false,
+    color: '#ffcc00'
+};
+
+// Platforms (Mario style layout)
+const platforms = [
+    { x: 0, y: 370, width: 800, height: 30 },   // Ground
+    { x: 150, y: 280, width: 120, height: 15 }, 
+    { x: 340, y: 200, width: 150, height: 15 },
+    { x: 550, y: 270, width: 120, height: 15 },
+    { x: 50, y: 160, width: 160, height: 15 },
+    { x: 600, y: 130, width: 140, height: 15 }
+];
+
+// Trash Setup
+// Types: 'plastic' (good), 'organic' (bad), 'paper' (bad)
+let items = [];
+const itemTypes = [
+    { type: 'plastic', color: '#00d2ff', label: '⚱️' },
+    { type: 'organic', color: '#ff9f43', label: '🍏' },
+    { type: 'paper', color: '#ffffff', label: '📦' }
+];
+
+// Event Listeners for controls
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => keys[e.code] = false);
+document.getElementById('restart-btn').addEventListener('click', resetGame);
+
+function spawnItem() {
+    if (gameOver) return;
+    
+    // Pick a random platform to spawn above (excluding ground level sometimes for variety)
+    const plat = platforms[Math.floor(Math.random() * platforms.length)];
+    const typeObj = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+    
+    // Random offset on the platform
+    const x = plat.x + Math.random() * (plat.width - 20);
+    const y = plat.y - 25;
+
+    // Avoid duplicate spawns instantly at the exact same spot
+    if (!items.some(item => Math.abs(item.x - x) < 20 && Math.abs(item.y - y) < 20)) {
+        items.push({
+            x: x,
+            y: y,
+            width: 20,
+            height: 20,
+            type: typeObj.type,
+            color: typeObj.color,
+            label: typeObj.label
+        });
+    }
+
+    // Keep spawning loop going dynamically
+    setTimeout(spawnItem, Math.random() * 1500 + 800);
+}
+
+function checkCollision(rect1, rect2) {
+    return rect1.x < rect2.x + rect2.width &&
+           rect1.x + rect1.width > rect2.x &&
+           rect1.y < rect2.y + rect2.height &&
+           rect1.y + rect1.height > rect2.y;
+}
+
+function update() {
+    if (gameOver) return;
+
+    // Movement logic
+    if (keys['ArrowRight'] || keys['KeyD']) {
+        if (player.vx < player.speed) player.vx++;
+    }
+    if (keys['ArrowLeft'] || keys['KeyA']) {
+        if (player.vx > -player.speed) player.vx--;
+    }
+    if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && player.grounded) {
+        player.vy = -player.jumpForce;
+        player.grounded = false;
+    }
+
+    // Apply physics
+    player.vx *= friction;
+    player.vy += gravity;
+
+    player.x += player.vx;
+    player.y += player.vy;
+
+    // Canvas boundaries
+    if (player.x < 0) player.x = 0;
+    if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
+    // Platform collisions
+    player.grounded = false;
+    for (let plat of platforms) {
+        // Simple AABB platform collision response
+        if (player.x < plat.x + plat.width &&
+            player.x + player.width > plat.x &&
+            player.y + player.height > plat.y &&
+            player.y + player.height - player.vy <= plat.y + 10) {
+            
+            if (player.vy > 0) {
+                player.grounded = true;
+                player.vy = 0;
+                player.y = plat.y - player.height;
+            }
+        }
+    }
+
+    // Item pickups
+    for (let i = items.length - 1; i >= 0; i--) {
+        if (checkCollision(player, items[i])) {
+            if (items[i].type === 'plastic') {
+                score += 10;
+                document.getElementById('plastic-score').innerText = score;
+            } else {
+                strikes++;
+                document.getElementById('strikes-score').innerText = `${strikes}/${maxStrikes}`;
+                if (strikes >= maxStrikes) {
+                    endGame();
+                }
+            }
+            items.splice(i, 1); // Remove item
+        }
+    }
+}
+
+function draw() {
+    // Clear Canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Background Sky details (Simple clouds)
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.arc(200, 80, 30, 0, Math.PI * 2);
+    ctx.arc(240, 70, 40, 0, Math.PI * 2);
+    ctx.arc(280, 80, 30, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw Platforms
+    for (let plat of platforms) {
+        ctx.fillStyle = '#4d774e'; // Grassy top color
+        ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+        ctx.fillStyle = '#8B5A2B'; // Dirt body color
+        ctx.fillRect(plat.x, plat.y + 4, plat.width, plat.height - 4);
+    }
+
+    // Draw Trash Items
+    for (let item of items) {
+        ctx.font = "20px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText(item.label, item.x + item.width/2, item.y);
+    }
+
+    // Draw Player (Retro Character style block)
+    ctx.fillStyle = player.color;
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+    
+    // Player Eyes (shows moving direction)
+    ctx.fillStyle = '#000';
+    let eyeOffset = player.vx >= 0 ? 18 : 4;
+    ctx.fillRect(player.x + eyeOffset, player.y + 10, 6, 6);
+    ctx.fillRect(player.x + eyeOffset + 6, player.y + 10, 6, 6);
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+    gameOver = true;
+    document.getElementById('game-over-screen').classList.remove('hidden');
+}
+
+function resetGame() {
+    score = 0;
+    strikes = 0;
+    gameOver = false;
+    items = [];
+    player.x = 100;
+    player.y = 300;
+    player.vx = 0;
+    player.vy = 0;
+    document.getElementById('plastic-score').innerText = '0';
+    document.getElementById('strikes-score').innerText = '0/3';
+    document.getElementById('game-over-screen').classList.add('hidden');
+}
+
+// Start the core mechanics
+resetGame();
+spawnItem();
+gameLoop();
+</script>
+
+</body>
+</html>
