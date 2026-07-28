@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plastic Patrol: Eco Edition</title>
+    <title>Plastic Patrol: Level Evolved</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            background: #141923;
+            background: #0d1117;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -21,10 +21,13 @@
         }
         #game-container {
             position: relative;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
             border: 6px solid #2c3e50;
             border-radius: 12px;
-            background: #5c94fc; /* Mario-esque Sky Blue */
+            overflow: hidden;
+            width: 800px;
+            height: 440px;
+            transition: background 0.5s ease;
         }
         canvas {
             display: block;
@@ -37,34 +40,38 @@
             display: flex;
             justify-content: space-between;
             pointer-events: none;
+            z-index: 5;
         }
         .score-box {
-            background: rgba(0, 0, 0, 0.65);
-            padding: 10px 20px;
+            background: rgba(13, 17, 23, 0.8);
+            padding: 10px 16px;
             border-radius: 8px;
-            font-size: 22px;
+            font-size: 18px;
             font-weight: bold;
             border: 2px solid #34495e;
             letter-spacing: 1px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
         }
         #plastic-score { color: #00ffcc; text-shadow: 0 0 8px rgba(0,255,204,0.5); }
+        #level-display { color: #ffeb3b; text-shadow: 0 0 8px rgba(255,235,59,0.5); }
         #strikes-container { color: #ff4d4d; }
-        .heart { display: inline-block; margin-left: 5px; color: #ff4d4d; }
         
         #screen-overlay {
             position: absolute;
             top: 0; left: 0; width: 800px; height: 440px;
-            background: rgba(20, 25, 35, 0.85);
+            background: rgba(13, 17, 23, 0.9);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 10;
-            backdrop-filter: blur(4px);
+            backdrop-filter: blur(5px);
         }
         .hidden { display: none !important; }
-        h1 { margin: 0 0 10px 0; font-size: 48px; color: #00ffcc; text-shadow: 0 4px 0 #127f67; }
-        p { margin: 0 0 25px 0; font-size: 18px; color: #a0aec0; text-align: center; line-height: 1.6; }
+        h1 { margin: 0 0 10px 0; font-size: 44px; color: #00ffcc; text-shadow: 0 4px 0 #127f67; text-align: center;}
+        p { margin: 0 0 25px 0; font-size: 16px; color: #a0aec0; text-align: center; line-height: 1.6; max-width: 500px; }
         
         button {
             padding: 14px 36px;
@@ -85,10 +92,11 @@
         #controls-guide {
             margin-top: 20px;
             font-size: 14px;
-            color: #718096;
+            color: #4a5568;
             text-align: center;
         }
         .highlight { color: #00ffcc; font-weight: bold; }
+        .level-up { color: #ffeb3b; font-weight: bold; }
         .danger { color: #ff7675; font-weight: bold; }
     </style>
 </head>
@@ -96,13 +104,23 @@
 
     <div id="game-container">
         <div id="ui">
-            <div class="score-box">PLASTIC: <span id="plastic-score">0000</span></div>
-            <div class="score-box">LIVES: <span id="strikes-container">❤️❤️❤️</span></div>
+            <div class="score-box">
+                <div>PLASTIC: <span id="plastic-score">0/5</span></div>
+                <div style="font-size: 13px; color: #aaa;">GOAL: <span id="goal-display">5</span> BOTTLES</div>
+            </div>
+            <div class="score-box" style="align-items: center;">
+                <div id="level-display">LEVEL 1</div>
+                <div style="font-size: 12px; color: #aaa;" id="level-name">SKY ZONE</div>
+            </div>
+            <div class="score-box" style="align-items: flex-end;">
+                <div>LIVES</div>
+                <div id="strikes-container">❤️❤️❤️</div>
+            </div>
         </div>
         
         <div id="screen-overlay">
             <h1 id="screen-title">PLASTIC PATROL</h1>
-            <p id="screen-desc">Collect the glowy <span class="highlight">Plastic Bottles</span> to clean the zone.<br>Ignore or dodge <span class="danger">Organic Trash & Boxes</span>!</p>
+            <p id="screen-desc">Explore the extended map! Collect enough <span class="highlight">Plastic Bottles</span> to advance through all 3 levels.<br>Avoid <span class="danger">Organic Trash & Box debris</span>!</p>
             <button id="action-btn">START GAME</button>
         </div>
 
@@ -110,80 +128,131 @@
     </div>
 
     <div id="controls-guide">
-        [A / D] or [◄ / ►] to Move &nbsp;&bull;&nbsp; [W], [SPACE], or [▲] to Jump
+        [A / D] or [◄ / ►] to Run Left/Right (Screen Scrolls) &nbsp;&bull;&nbsp; [W], [SPACE], or [▲] to Jump
     </div>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const container = document.getElementById('game-container');
 
-// Game State Engine
-let score = 0;
+// Level Configurations
+const levels = {
+    1: { name: "SKY ZONE", target: 5, bg: "#5c94fc", platformTop: "#2ecc71", platformBottom: "#795548", spawnRate: 1400 },
+    2: { name: "INDUSTRIAL RUINS", target: 8, bg: "#34495e", platformTop: "#e67e22", platformBottom: "#2c3e50", spawnRate: 1000 },
+    3: { name: "MIDNIGHT CORE", target: 12, bg: "#11141a", platformTop: "#9b59b6", platformBottom: "#1e272e", spawnRate: 700 }
+};
+
+// Game Dynamic Configurations
+let currentLevel = 1;
+let score = 0; // Total overall score
+let levelBottlesCollected = 0; // Reset every level
 let lives = 3;
 let gameOver = false;
 let gameStarted = false;
 let keys = {};
 let animationFrame = 0;
 
-// Physics Config
+// World Scale Dimensions
+const worldWidth = 1600; // Double screen width for side-scrolling exploration
+const worldHeight = 440;
+
+// Camera System Matrix
+const camera = { x: 0, y: 0 };
+
+// Physics Configuration
 const gravity = 0.55;
 const friction = 0.82;
 
-// Character Properties
+// Character Data
 const player = {
     x: 100, y: 300, width: 28, height: 44,
-    vx: 0, vy: 0, speed: 5.5, jumpForce: 12.5,
+    vx: 0, vy: 0, speed: 6, jumpForce: 13,
     grounded: false, facingRight: true, walkTimer: 0
 };
 
-// Map Structure (Mario Retro Grid Layout)
+// Extended Platform Map Configuration Layout ($1600\text{px}$ Wide)
 const platforms = [
-    { x: 0, y: 400, width: 800, height: 40, type: 'floor' },   // Ground floor
-    { x: 60, y: 300, width: 160, height: 20 },
-    { x: 300, y: 220, width: 200, height: 20 },
-    { x: 580, y: 300, width: 160, height: 20 },
-    { x: 100, y: 130, width: 140, height: 20 },
-    { x: 560, y: 130, width: 140, height: 20 }
+    { x: 0, y: 400, width: 1600, height: 40 }, // Solid Floor spanning the entire world length
+    
+    // Sector 1 (0px - 500px)
+    { x: 120, y: 300, width: 160, height: 20 },
+    { x: 280, y: 210, width: 140, height: 20 },
+    { x: 60, y: 140, width: 120, height: 20 },
+
+    // Sector 2 (500px - 1000px Central Hub)
+    { x: 500, y: 290, width: 200, height: 20 },
+    { x: 760, y: 200, width: 180, height: 20 },
+    { x: 600, y: 110, width: 130, height: 20 },
+
+    // Sector 3 (1000px - 1600px Outpost)
+    { x: 1020, y: 280, width: 150, height: 20 },
+    { x: 1240, y: 190, width: 200, height: 20 },
+    { x: 1080, y: 110, width: 140, height: 20 },
+    { x: 1480, y: 290, width: 120, height: 20 }
 ];
 
 let items = [];
 let spawnTimeout;
 
-// Input Bindings
+// Controls Interceptors
 window.addEventListener('keydown', e => { if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) e.preventDefault(); keys[e.code] = true; });
 window.addEventListener('keyup', e => keys[e.code] = false);
 document.getElementById('action-btn').addEventListener('click', handleButtonClick);
 
 function handleButtonClick() {
     if (!gameStarted || gameOver) {
-        resetGame();
+        currentLevel = 1;
+        score = 0;
+        lives = 3;
+        setupLevel(currentLevel);
         gameStarted = true;
         gameOver = false;
         document.getElementById('screen-overlay').classList.add('hidden');
-        clearTimeout(spawnTimeout);
-        spawnItem();
+        startSpawning();
     }
 }
 
-function spawnItem() {
-    if (gameOver || !gameStarted) return;
+function setupLevel(lvl) {
+    levelBottlesCollected = 0;
+    items = [];
+    player.x = 100;
+    player.y = 300;
+    player.vx = 0;
+    player.vy = 0;
     
-    // Pick a targeted platform surface layout
-    const plat = platforms[Math.floor(Math.random() * platforms.length)];
-    const roll = Math.random();
-    let type = 'plastic';
-    if (roll > 0.45 && roll <= 0.75) type = 'organic';
-    else if (roll > 0.75) type = 'paper';
-    
-    const x = plat.x + 15 + Math.random() * (plat.width - 45);
-    const y = plat.y - 30;
+    container.style.background = levels[lvl].bg;
+    document.getElementById('level-display').innerText = `LEVEL ${lvl}`;
+    document.getElementById('level-name').innerText = levels[lvl].name;
+    document.getElementById('goal-display').innerText = levels[lvl].target;
+    updateUI();
+}
 
-    // Check overlap boundaries to reduce cluster spawns
-    if (!items.some(i => Math.abs(i.x - x) < 35 && Math.abs(i.y - y) < 35)) {
-        items.push({ x, y, width: 24, height: 28, type, bobOffset: Math.random() * Math.PI });
+function startSpawning() {
+    clearTimeout(spawnTimeout);
+    function loop() {
+        if (gameOver || !gameStarted) return;
+        
+        // Pick random platform anywhere along the wider map
+        const plat = platforms[Math.floor(Math.random() * platforms.length)];
+        const roll = Math.random();
+        
+        // Dynamic balance based on level settings
+        let type = 'plastic';
+        if (roll > 0.40 - (currentLevel * 0.05)) { // Hazards increase slightly per level
+            type = Math.random() > 0.5 ? 'organic' : 'paper';
+        }
+
+        const x = plat.x + 15 + Math.random() * (plat.width - 45);
+        const y = plat.y - 30;
+
+        if (!items.some(i => Math.abs(i.x - x) < 40)) {
+            items.push({ x, y, width: 24, height: 28, type, bobOffset: Math.random() * Math.PI });
+        }
+        
+        spawnTimeout = setTimeout(loop, Math.random() * levels[currentLevel].spawnRate + 400);
     }
-
-    spawnTimeout = setTimeout(spawnItem, Math.random() * 1200 + 600);
+    loop();
 }
 
 function checkCollision(r1, r2) {
@@ -196,19 +265,20 @@ function update() {
 
     animationFrame++;
 
-    // Movement Physics
+    // Horizontal Controls Translation
     if (keys['ArrowRight'] || keys['KeyD']) {
         if (player.vx < player.speed) player.vx += 0.8;
         player.facingRight = true;
-        if(player.grounded) player.walkTimer += 0.2;
+        if(player.grounded) player.walkTimer += 0.25;
     } else if (keys['ArrowLeft'] || keys['KeyA']) {
         if (player.vx > -player.speed) player.vx -= 0.8;
         player.facingRight = false;
-        if(player.grounded) player.walkTimer += 0.2;
+        if(player.grounded) player.walkTimer += 0.25;
     } else {
         player.walkTimer = 0;
     }
 
+    // Vertical Jump Calculations
     if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && player.grounded) {
         player.vy = -player.jumpForce;
         player.grounded = false;
@@ -219,11 +289,11 @@ function update() {
     player.x += player.vx;
     player.y += player.vy;
 
-    // Screen Boundary Restraints
+    // Hard Boundaries clamped to World Width ($1600\text{px}$)
     if (player.x < 0) { player.x = 0; player.vx = 0; }
-    if (player.x + player.width > canvas.width) { player.x = canvas.width - player.width; player.vx = 0; }
+    if (player.x + player.width > worldWidth) { player.x = worldWidth - player.width; player.vx = 0; }
 
-    // Platform Collisions Solid Math
+    // Solid Platform Collisions Matrix
     player.grounded = false;
     for (let plat of platforms) {
         if (player.x + player.width > plat.x && player.x < plat.x + plat.width &&
@@ -236,27 +306,50 @@ function update() {
         }
     }
 
-    // Interactive Item Checks
+    // Smooth Side-Scrolling Camera Physics Tracker
+    camera.x = player.x - canvas.width / 2 + player.width / 2;
+    // Keep camera bounded within world dimensions
+    if (camera.x < 0) camera.x = 0;
+    if (camera.x > worldWidth - canvas.width) camera.x = worldWidth - canvas.width;
+
+    // Item Intersection Loop Logic
     for (let i = items.length - 1; i >= 0; i--) {
         if (checkCollision(player, items[i])) {
             if (items[i].type === 'plastic') {
                 score += 100;
-                document.getElementById('plastic-score').innerText = String(score).padStart(4, '0');
+                levelBottlesCollected++;
+                updateUI();
+                
+                // Track Target Goals across 3 unique levels
+                if (levelBottlesCollected >= levels[currentLevel].target) {
+                    advanceLevel();
+                }
             } else {
                 lives--;
-                updateLivesUI();
-                if (lives <= 0) endGame();
+                updateUI();
+                if (lives <= 0) endGame(false);
             }
             items.splice(i, 1);
         }
     }
 }
 
-function updateLivesUI() {
+function advanceLevel() {
+    if (currentLevel < 3) {
+        currentLevel++;
+        setupLevel(currentLevel);
+        // Momentary Flash Notification can be read from interface state changes
+    } else {
+        endGame(true); // Player completed Level 3 successfully!
+    }
+}
+
+function updateUI() {
+    const target = levels[currentLevel].target;
+    document.getElementById('plastic-score').innerText = `${levelBottlesCollected}/${target}`;
     document.getElementById('strikes-container').innerText = '❤️'.repeat(Math.max(0, lives)) + '🖤'.repeat(Math.max(0, 3 - lives));
 }
 
-// Custom Vector Art Generators (No PNG dependency)
 function drawPlayer(ctx, p) {
     ctx.save();
     ctx.translate(p.x + p.width/2, p.y + p.height/2);
@@ -264,62 +357,59 @@ function drawPlayer(ctx, p) {
 
     const bob = (!p.grounded) ? 0 : Math.sin(p.walkTimer) * 3;
     
-    // Legs running cycle engine
+    // Legs Rendering
     ctx.fillStyle = '#1e272e';
-    if (!p.grounded) { // Jump pose
+    if (!p.grounded) {
         ctx.fillRect(-10, 8, 6, 10);
         ctx.fillRect(4, 2, 6, 10);
-    } else if (p.walkTimer > 0) { // Walk animation
+    } else if (p.walkTimer > 0) {
         ctx.fillRect(Math.sin(p.walkTimer)*5 - 4, 8, 6, 12);
         ctx.fillRect(-Math.sin(p.walkTimer)*5 - 4, 8, 6, 12);
-    } else { // Idle
+    } else {
         ctx.fillRect(-9, 8, 6, 14);
         ctx.fillRect(3, 8, 6, 14);
     }
 
-    // Torso (Jacket & Overalls)
+    // Jumpsuit Body Geometry
     ctx.fillStyle = '#ff3f34'; 
     ctx.fillRect(-12, -12 + bob, 24, 22); 
-    ctx.fillStyle = '#0abde3'; // Blue overalls denim finish
+    ctx.fillStyle = '#0abde3'; 
     ctx.fillRect(-12, -2 + bob, 24, 12);
     ctx.fillRect(-8, -8 + bob, 4, 8);
     ctx.fillRect(4, -8 + bob, 4, 8);
 
-    // Head & Hair
+    // Head Unit Structure
     ctx.fillStyle = '#ffdb99'; 
     ctx.fillRect(-8, -26 + bob, 16, 15);
-    ctx.fillStyle = '#d6a2e8'; // Cap base
+    ctx.fillStyle = '#48dbfb'; // Visor cap color configuration matching
     ctx.fillRect(-10, -30 + bob, 18, 6);
-    ctx.fillRect(-2, -30 + bob, 16, 3); // Cap brim/visor
+    ctx.fillRect(-2, -30 + bob, 16, 3); 
 
-    // Face Detail Directional alignment
     ctx.fillStyle = '#2c3e50';
-    ctx.fillRect(3, -21 + bob, 3, 4); // Eye
+    ctx.fillRect(3, -21 + bob, 3, 4); 
     ctx.fillStyle = '#ff7675';
-    ctx.fillRect(6, -16 + bob, 3, 2); // Smile/Mouth
+    ctx.fillRect(6, -16 + bob, 3, 2); 
 
     ctx.restore();
 }
 
 function drawPlatform(ctx, plat) {
-    // Structural Dirt Blocks Base
-    ctx.fillStyle = '#795548';
+    const activeColors = levels[currentLevel];
+    
+    // Core structural foundation filling
+    ctx.fillStyle = activeColors.platformBottom;
     ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
     
-    // Grid Brick Segment Overlays 
-    ctx.strokeStyle = '#5d4037';
+    // Brick grid profile paths lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
     ctx.lineWidth = 2;
     for (let bx = plat.x; bx < plat.x + plat.width; bx += 20) {
         ctx.strokeRect(bx, plat.y, 20, plat.height);
     }
 
-    // Bright Green Stylized Top Turf Grass Layer
-    ctx.fillStyle = '#2ecc71';
+    // Highlighted dynamic zone surface trims
+    ctx.fillStyle = activeColors.platformTop;
     ctx.fillRect(plat.x, plat.y, plat.width, 6);
-    ctx.fillStyle = '#27ae60'; // Grass shadow accents
-    for(let gx = plat.x + 4; gx < plat.x + plat.width; gx += 12) {
-        ctx.fillRect(gx, plat.y + 6, 5, 4);
-    }
 }
 
 function drawItem(ctx, item) {
@@ -330,41 +420,29 @@ function drawItem(ctx, item) {
     ctx.save();
     
     if (item.type === 'plastic') {
-        // High visibility Glowing Plastic Bottle graphic
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 10;
         ctx.shadowColor = '#00ffcc';
-        
-        ctx.fillStyle = 'rgba(240, 255, 255, 0.85)';
+        ctx.fillStyle = 'rgba(230, 255, 255, 0.9)';
         ctx.strokeStyle = '#00ffcc';
         ctx.lineWidth = 2;
-        
-        // Bottle shapes geometry pathing
         ctx.beginPath();
         ctx.rect(cx - 6, cy - 4, 12, 16);
         ctx.rect(cx - 3, cy - 10, 6, 6);
         ctx.fill();
         ctx.stroke();
-        
-        // Blue Label accent strip
         ctx.fillStyle = '#2980b9';
         ctx.fillRect(cx - 6, cy, 12, 4);
     } 
     else if (item.type === 'organic') {
-        // Rotting Apple Core Graphic profile
         ctx.fillStyle = '#e74c3c';
         ctx.beginPath();
-        ctx.arc(cx, cy - 6, 7, 0, Math.PI, true);
-        ctx.arc(cx, cy + 8, 7, 0, Math.PI, false);
+        ctx.arc(cx, cy - 5, 7, 0, Math.PI, true);
+        ctx.arc(cx, cy + 7, 7, 0, Math.PI, false);
         ctx.fill();
-        
-        // Core center bite cylinder profile
         ctx.fillStyle = '#f5f6fa';
-        ctx.fillRect(cx - 4, cy - 6, 8, 14);
-        ctx.fillStyle = '#2f3640'; // Seeds detail
-        ctx.fillRect(cx - 1, cy, 2, 3);
+        ctx.fillRect(cx - 4, cy - 5, 8, 12);
     } 
     else if (item.type === 'paper') {
-        // Crumpled Cardboard Waste Box graphic profile
         ctx.fillStyle = '#d2a679';
         ctx.strokeStyle = '#8a6d4f';
         ctx.lineWidth = 2;
@@ -372,37 +450,41 @@ function drawItem(ctx, item) {
         ctx.rect(cx - 9, cy - 6, 18, 15);
         ctx.fill();
         ctx.stroke();
-        // Box opening flaps flap art
-        ctx.fillStyle = '#b8860b';
-        ctx.fillRect(cx - 11, cy - 10, 8, 4);
-        ctx.fillRect(cx + 3, cy - 10, 8, 4);
     }
-    
     ctx.restore();
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Parallax background clouds decoration layers
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.beginPath();
-    ctx.arc(140, 100, 25, 0, Math.PI * 2); ctx.arc(175, 90, 35, 0, Math.PI * 2); ctx.arc(210, 100, 25, 0, Math.PI * 2);
-    ctx.arc(580, 70, 20, 0, Math.PI * 2);  ctx.arc(610, 60, 30, 0, Math.PI * 2);  ctx.arc(640, 70, 20, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.save();
+    // Offset standard renderer transformation context matrix based on current Camera space coordinates
+    ctx.translate(-camera.x, -camera.y);
 
-    // Draw Map Assets
+    // Decorative Stars / Cloud elements distributed along long map plane
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    for(let cx = 100; cx < worldWidth; cx += 400) {
+        ctx.beginPath();
+        ctx.arc(cx, 100, 20, 0, Math.PI * 2);
+        ctx.arc(cx + 30, 90, 30, 0, Math.PI * 2);
+        ctx.arc(cx + 60, 100, 20, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Render Platform Layers
     for (let plat of platforms) {
         drawPlatform(ctx, plat);
     }
 
-    // Draw collectible variants
+    // Render Entities
     for (let item of items) {
         drawItem(ctx, item);
     }
 
-    // Render character layer
+    // Render Main Hero
     drawPlayer(ctx, player);
+
+    ctx.restore();
 }
 
 function gameLoop() {
@@ -411,28 +493,30 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-function endGame() {
+function endGame(victory = false) {
     gameOver = true;
-    document.getElementById('screen-title').innerText = "GAME OVER";
-    document.getElementById('screen-desc').innerHTML = `You filled the bin with too much bad trash!<br>Final Score: <span class="highlight">${score} points</span>`;
-    document.getElementById('action-btn').innerText = "TRY AGAIN";
+    clearTimeout(spawnTimeout);
+    
+    const title = document.getElementById('screen-title');
+    const desc = document.getElementById('screen-desc');
+    const btn = document.getElementById('action-btn');
+    
+    if (victory) {
+        title.innerText = "MISSION ACCOMPLISHED";
+        title.style.color = "#ffeb3b";
+        desc.innerHTML = `Incredible work! You successfully cleaned all 3 sectors.<br>Grand Total Score: <span class="highlight">${score} points</span>`;
+        btn.innerText = "PLAY AGAIN";
+    } else {
+        title.innerText = "BIN OVERFLOW";
+        title.style.color = "#ff4d4d";
+        desc.innerHTML = `You took too many safety strikes from hazardous items!<br>Stalled out on <span class="level-up">Level ${currentLevel}</span> with ${score} points.`;
+        btn.innerText = "RETRY CHALLENGE";
+    }
+    
     document.getElementById('screen-overlay').classList.remove('hidden');
 }
 
-function resetGame() {
-    score = 0;
-    lives = 3;
-    items = [];
-    player.x = 100;
-    player.y = 300;
-    player.vx = 0;
-    player.vy = 0;
-    player.grounded = false;
-    document.getElementById('plastic-score').innerText = '0000';
-    updateLivesUI();
-}
-
-// System Init engine kickoff
+// Global initialization configuration kickoff
 gameLoop();
 </script>
 
